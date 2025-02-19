@@ -48,10 +48,10 @@ def cropMid(tempImagePath, img):
     width, height = img.size
     left = 0
     # top = 743
-    top = height/2 + height * 0.14
+    top = height/2 + height * 0.142
     right = width / 2
     # bottom = height - 383
-    bottom = height - height * 0.335
+    bottom = height - height * 0.33
     return cropImage(img, top, bottom, left, right, tempImagePath, 'charts_mid.png')
 
 
@@ -195,7 +195,7 @@ def saveOcrJsonData(stockCode, reader, onError):
     #  tempStockDir 下所有的png文件
     jsonData = []
     try:
-        for i in reversed(os.listdir(tempStockDir)):
+        for i in sorted(os.listdir(tempStockDir),reverse=True):
             if "data.json" in i:
                 continue
             keyName = i.split("_")[-1].replace(".png", "")

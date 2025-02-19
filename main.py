@@ -5,7 +5,6 @@ from functools import partial
 import json
 
 from easyocr import easyocr
-
 from kivy.config import Config
 
 from utils import startGetData
@@ -69,16 +68,11 @@ class MyApp(App):
             valign='top',
         )
 
-
-
-
         # 添加输入框和按钮到水平布局
         input_layout.add_widget(self.input_field)
         input_layout.add_widget(add_button)
 
-
         left_layout.add_widget(use_tips)
-
 
         # 在scrape_button 上方添加打开结果文件夹按钮
         left_layout.add_widget(self.open_button)
@@ -103,7 +97,7 @@ class MyApp(App):
         return self.root
 
     def open_folder(self, instance):
-        path = os.path.join(current_directory, 'result')
+        path = os.path.join('result')
         if platform.system() == 'Darwin':  # macOS
             os.system(f'open "{path}"')
         elif platform.system() == 'Windows':  # Windows
@@ -270,7 +264,8 @@ class MyApp(App):
 if __name__ == '__main__':
     # 创建 OCR 识别器对象，指定语言
     modelPath = os.path.join("model")
-    reader = easyocr.Reader(['en', 'ch_sim'],model_storage_directory=os.path.join("model"),download_enabled=False)  # 英文和简体中文
+    reader = easyocr.Reader(['en', 'ch_sim'], model_storage_directory=os.path.join("model"),
+                            download_enabled=False)  # 英文和简体中文
 
     # 创建result 文件夹
     if not os.path.exists("result"):
@@ -280,12 +275,3 @@ if __name__ == '__main__':
         shutil.rmtree("temp")
 
     MyApp().run()
-
-
-
-
-
-
-
-
-
