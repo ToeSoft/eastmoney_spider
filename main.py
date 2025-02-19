@@ -118,9 +118,8 @@ class MyApp(App):
         Clock.schedule_once(lambda dt: self.text_list_layout.clear_widgets(), 0)
         Clock.schedule_once(lambda dt: self.load_data(), 0)
 
-    def onError(self, text):
-        Clock.schedule_once(lambda dt: self.close_loading_popup(), 0)
-        Clock.schedule_once(lambda dt: self.show_tips_popup(text, True), 0)
+    def onError(self, text,auto_dismiss=False):
+        Clock.schedule_once(lambda dt: self.show_tips_popup(text, auto_dismiss), 0)
 
     def show_loading_popup(self):
         # 创建弹出框
@@ -131,10 +130,10 @@ class MyApp(App):
 
     def show_tips_popup(self, text, auto_dismiss):
         # 创建弹出框
-        self.popup = Popup(title=text, size_hint=(None, None), size=(400, 200))
+        self.tips_popup = Popup(title=text, size_hint=(None, None), size=(400, 200))
         # 不显示 进度条
-        self.popup.separator_color = [0, 0, 0, 0]
-        self.popup.open()
+        self.tips_popup.separator_color = [0, 0, 0, 0]
+        self.tips_popup.open()
         #     延迟三秒后关闭弹出框
         if auto_dismiss:
             Clock.schedule_once(lambda dt: self.close_loading_popup(), 3)
