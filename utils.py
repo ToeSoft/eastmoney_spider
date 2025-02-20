@@ -29,15 +29,26 @@ dictMap = {
     "80S24":"BIAS24",
     "BlAS24":"BIAS24",
     "WIRIO":"WR10",
-    "MA":"ROC_MA",
     "OBVMA":"OBV_MA",
     "RS124":"RSI24",
+    "BlAS6":"BIAS6",
+    "BlAS12":"BIAS12",
+    "BIA86":"BIAS6",
+    "BIA812":"BIAS12",
+    "BIA824":"BIAS24",
+    "BlA86":"BIAS6",
+    "BlA812":"BIAS12",
+    "BlA824":"BIAS24",
+    "MAI":"MA1",
+    "RSII2":"RSI12",
+    "IRG":"WR6",
+    "NA10":"MA10",
 }
 
 
 def cropTop(tempImagePath, img):
     width, height = img.size
-    left = 0
+    left = width * 0.184
     top = 0
     right = width / 2 + 300
     bottom = height * 0.035
@@ -69,12 +80,14 @@ def cropBottom(tempImagePath, img, name):
 
 def cropImage(img, top, bottom, left, right, tempImagePath, saveName):
     cropped_img = img.crop((left, top, right, bottom))
+    cropped_img = cropped_img.convert("L")
+    cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
     enhancer = ImageEnhance.Contrast(cropped_img)
     cropped_img = enhancer.enhance(2.0)
-    cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
     cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
     cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
-    cropped_img = cropped_img.resize((cropped_img.width, cropped_img.height), Image.Resampling.LANCZOS)
+
+
 
     imgPath = os.path.join(tempImagePath, saveName)
     cropped_img.save(imgPath)
@@ -233,7 +246,7 @@ def getData(stockCode, onError):
 
     try:
         chromePage.get("https://quote.eastmoney.com/concept/" + stockCode + ".html")
-        time.sleep(1)
+        time.sleep(3)
         name = chromePage.ele("tag:span@class=name")
 
         detailTable = chromePage.ele("tag:div@class=stockitems").ele("tag:table")
