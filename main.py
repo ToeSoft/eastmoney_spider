@@ -23,6 +23,7 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.popup import Popup
 from kivy.clock import Clock
+from kivy.uix.togglebutton import ToggleButton
 
 # 文件路径用于保存列表数据
 DATA_FILE = os.path.join('stock_list.json')
@@ -54,6 +55,22 @@ class MyApp(App):
             on_text_validate=self.add_text  # 回车触发 add_text 方法
         )
 
+        # 创建单选框布局
+        self.radio_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, spacing=10)
+
+        # 输出格式选择 - 输出 txt
+        self.txt_radio = ToggleButton(group='output', state='down')  # 设置为选中状态
+        txt_label = Label(text="输出 TXT", size_hint_y=None, height=60)
+        self.radio_layout.add_widget(self.txt_radio)
+        self.radio_layout.add_widget(txt_label)
+
+        # 输出格式选择 - 输出 Excel
+        self.excel_radio = ToggleButton(group='output', state='normal')  # 默认为未选中
+        excel_label = Label(text="输出 Excel", size_hint_y=None, height=60)
+        self.radio_layout.add_widget(self.excel_radio)
+        self.radio_layout.add_widget(excel_label)
+
+
         # 将输入框和添加按钮放入水平布局
         input_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, spacing=10)
         add_button = Button(text='添加', size_hint_y=None, height=60, size_hint_x=0.1)  # 按钮占用 10% 宽度
@@ -75,6 +92,7 @@ class MyApp(App):
         left_layout.add_widget(use_tips)
 
         # 在scrape_button 上方添加打开结果文件夹按钮
+        left_layout.add_widget(self.radio_layout)
         left_layout.add_widget(self.open_button)
         # 在输入框上方添加爬取按钮
         left_layout.add_widget(self.scrape_button)
@@ -110,7 +128,8 @@ class MyApp(App):
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 items = json.load(f)
-            startGetData(items, reader, self.onFinish, self.onError)
+            output_format = 'txt' if self.txt_radio.state == 'down' else 'excel'
+            startGetData(items, reader, self.onFinish, self.onError,output_format)
 
     def onFinish(self):
         Clock.schedule_once(lambda dt: self.close_loading_popup(), 0)

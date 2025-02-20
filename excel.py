@@ -5,6 +5,49 @@ from openpyxl import load_workbook
 from openpyxl.drawing.image import Image
 
 
+def generateTxt(name, code, onError):
+    try:
+        # 读取文件夹中的所有文件
+        dir = os.path.join("temp", code)
+        files = os.listdir(dir)
+
+        # 读取data.json文件
+        with open(os.path.join(dir, "data.json"), "r", encoding="utf-8") as f:
+            jsonData = json.load(f)
+
+        # 创建 txt 文件的保存路径
+        time = pd.Timestamp.now()
+        formatTime = time.strftime('%Y-%m-%d')
+        dir_path = os.path.join("result", formatTime)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        txt_path = os.path.join(dir_path, name + "(" + code + ")" + " " + formatTime + ".txt")
+
+        # 打开文本文件准备写入
+        with open(txt_path, "w", encoding="utf-8") as f:
+            # 迭代 json 数据并写入
+            for i in jsonData:
+                for tag, value in i.items():
+                    # Write tag name
+                    f.write(f"{tag}\n")
+
+                    # Write the elements inside the tag on a single line
+                    for x in value:
+                        for z in x.keys():
+                            f.write(f"{z}: {x[z]} ")
+                    f.write("\n")  # Ensure elements are on one line for each entry
+
+        # 提示成功
+        print(f"TXT file saved to {txt_path}")
+
+    except Exception as e:
+        with open("error.log", "a", encoding="utf-8") as f:
+            f.write(str(e))
+        onError(code + "生成TXT失败")
+
+
+
 def generateExcel(name, code,onError):
 
     try:

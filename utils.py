@@ -6,7 +6,7 @@ import time
 from DrissionPage import ChromiumPage
 from PIL import Image, ImageEnhance, ImageFilter
 from DrissionPage import ChromiumOptions
-from excel import generateExcel
+from excel import generateExcel, generateTxt
 import concurrent.futures
 
 
@@ -14,6 +14,7 @@ dictMap = {
     "RSIG": "RSI6",
     "成交量": "VOL",
     "[交量":"VOL",
+    "嵌交量":"VOL",
     "成交垂":"VOL",
     "PDl": "PDI",
     "MDl": "MDI",
@@ -43,12 +44,14 @@ dictMap = {
     "RSII2":"RSI12",
     "IRG":"WR6",
     "NA10":"MA10",
+    "VA5":"MA5",
+    "MAZ":"MA2"
 }
 
 
 def cropTop(tempImagePath, img):
     width, height = img.size
-    left = width * 0.184
+    left = width * 0.1825
     top = 0
     right = width / 2 + 300
     bottom = height * 0.035
@@ -83,8 +86,8 @@ def cropImage(img, top, bottom, left, right, tempImagePath, saveName):
     cropped_img = cropped_img.convert("L")
     cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
     enhancer = ImageEnhance.Contrast(cropped_img)
-    cropped_img = enhancer.enhance(2.0)
-    cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
+    cropped_img = enhancer.enhance(1.8)
+    # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
     cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
 
 
@@ -136,7 +139,7 @@ def getImageText(reader, imageName):
     return ocrResultList
 
 
-def startWithThread(items, reader, onFinish, onError):
+def startWithThread(items, reader, onFinish, onError,output_format):
     # 记录开始时间
     start_time = time.time()
 
@@ -180,7 +183,10 @@ def startWithThread(items, reader, onFinish, onError):
         for i in stockList:
             if ":" not in i:
                 continue
-            generateExcel(i.split(":")[1], i.split(":")[0],onError)
+            if output_format == "excel":
+                generateExcel(i.split(":")[1], i.split(":")[0],onError)
+            else:
+                generateTxt(i.split(":")[1], i.split(":")[0], onError)
 
 
     # 读取stock_list.json的时间
@@ -234,8 +240,8 @@ def saveOcrJsonData(stockCode, reader, onError):
         onError(stockCode+"OCR识别失败")
 
 
-def startGetData(items, reader, onFinish, onError):
-    threading.Thread(target=startWithThread, args=(items, reader, onFinish, onError)).start()
+def startGetData(items, reader, onFinish, onError,output_format):
+    threading.Thread(target=startWithThread, args=(items, reader, onFinish, onError,output_format)).start()
 
 
 def getData(stockCode, onError):
@@ -249,6 +255,8 @@ def getData(stockCode, onError):
         # 等待页面加载完成
         time.sleep(5)
         name = chromePage.ele("tag:span@class=name")
+        zde = chromePage.ele("tag:span@class=zde")
+        zdf = chromePage.ele("tag:span@class=zdf")
 
         detailTable = chromePage.ele("tag:div@class=stockitems").ele("tag:table")
 
@@ -287,6 +295,8 @@ def getData(stockCode, onError):
         tempData = [
             {"名称": name.text},
             {"代码": stockCode},
+            {"涨跌额":zde.text},
+            {"涨跌幅":zdf.text},
         ]
         tempData.extend(detailList)
 
