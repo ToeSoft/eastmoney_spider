@@ -36,7 +36,10 @@ def generateTxt(name, code, onError):
                     count = 0
                     for x in value:
                         for z in x.keys():
-                            if tag == "概览" and count % 4 == 0 and count != 0:
+                            if tag == "概览" and count == 4:
+                                f.write("\n")
+
+                            if tag == "概览" and (count-4) % 6 == 0 and count != 0 and count != 4:
                                 f.write("\n")  # Ensure elements are on one line for each entry
                             f.write(f"{z}: {x[z]} ")
                             count += 1

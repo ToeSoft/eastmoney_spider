@@ -10,7 +10,19 @@ from excel import generateExcel, generateTxt
 import concurrent.futures
 import pytesseract
 
+dictMapTop = {
+    "MA3": "MA5",
+    "MAS":"MA5",
+}
+
 dictMap = {
+    "RS6": "RSI6",
+    "RS24": "RSI24",
+    "RS10": "RSI10",
+    "WRI10": "WR10",
+    "MA‘": "MA1",
+    "CCL": "CCI",
+    "CCl": "CCI",
     "RSIG": "RSI6",
     "成交量": "VOL",
     "[交量": "VOL",
@@ -49,14 +61,16 @@ dictMap = {
     "BlIAS24": "BIAS24",
     "DOBV": "OBV",
     "MAS": "MA3",
-    "MAS5":"MA5",
-    "A5":"MA5",
+    "MAS5": "MA5",
+    "A5": "MA5",
+    "MiA5": "MA5",
+    "MAS80": "MA30",
 }
 
 
 def cropTop(tempImagePath, img):
     width, height = img.size
-    left = width * 0.178
+    left = 0
     top = 0
     right = width / 2 + 300
     bottom = height * 0.035
@@ -70,7 +84,7 @@ def cropMid(tempImagePath, img):
     top = height / 2 + height * 0.142
     right = width / 2
     # bottom = height - 383
-    bottom = height - height * 0.331
+    bottom = height - height * 0.333
     return cropImage(img, top, bottom, left, right, tempImagePath, 'charts_mid.png')
 
 
@@ -81,7 +95,7 @@ def cropBottom(tempImagePath, img, name):
     top = height / 2 + height * 0.325
     right = width / 2
     # bottom = height - 170
-    bottom = height - height * 0.145
+    bottom = height - height * 0.1465
     return cropImage(img, top, bottom, left, right, tempImagePath,
                      'charts_btm_' + name.split("_")[1].replace(".png", "") + '.png')
 
@@ -90,13 +104,13 @@ def cropImage(img, top, bottom, left, right, tempImagePath, saveName):
     if "CCI" in saveName:
         right = right / 2
     cropped_img = img.crop((left, top, right, bottom))
-    cropped_img = cropped_img.convert("L")
+    # cropped_img = cropped_img.convert("L")
     # cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
     # if "CCI" in saveName:
     #     cropped_img = cropped_img.convert("L")
     #     cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
     enhancer = ImageEnhance.Contrast(cropped_img)
-    cropped_img = enhancer.enhance(1)
+    cropped_img = enhancer.enhance(2)
     # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
     # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
 
@@ -124,6 +138,12 @@ def convertKey(key):
     return key
 
 
+def convertKeyTop(key):
+    if key in dictMapTop:
+        return dictMapTop[key]
+    return key
+
+
 def startWithThread(items, reader, onFinish, onError, output_format):
     # 记录开始时间
     start_time = time.time()
@@ -133,7 +153,7 @@ def startWithThread(items, reader, onFinish, onError, output_format):
     # 记录创建temp目录的时间
     step1 = time.time()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = []
 
         # 记录创建线程池的时间
@@ -148,9 +168,12 @@ def startWithThread(items, reader, onFinish, onError, output_format):
 
         # 记录线程任务完成的时间
         step3 = time.time()
-
-    for i in os.listdir(os.path.join("temp")):
-        saveOcrJsonData(i, reader, onError)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = []
+        for i in os.listdir(os.path.join("temp")):
+            futures.append(executor.submit(saveOcrJsonData,i,reader, onError))
+            # saveOcrJsonData(i, reader, onError)
+    concurrent.futures.wait(futures)
     # 记录保存OCR数据的时间
     step4 = time.time()
 
@@ -231,7 +254,7 @@ def getData(stockCode, onError):
     try:
         chromePage.get("https://quote.eastmoney.com/concept/" + stockCode + ".html")
         # 等待页面加载完成
-        time.sleep(5)
+        time.sleep(1)
         name = chromePage.ele("tag:span@class=name")
         zde = chromePage.ele("tag:span@class=zde")
         zdf = chromePage.ele("tag:span@class=zdf")
@@ -275,7 +298,11 @@ def getData(stockCode, onError):
             {"涨跌额": zde.text},
             {"涨跌幅": zdf.text},
         ]
-        tempData.extend(detailList)
+
+        if len(detailList) > 12:
+            tempData.extend(detailList[:12])
+        else:
+            tempData.extend(detailList)
 
         with open(os.path.join("temp", stockCode, "data.json"), "w", encoding="utf-8") as f:
             json.dump([{"概览": tempData}], f, ensure_ascii=False, indent=4)
@@ -360,6 +387,9 @@ def getImageText(reader, imageName):
     for text in resultList:
         if ":" in text:
             key, value = text.split(":")
-            key = convertKey(key)
+            if "top" in imageName:
+                key = convertKeyTop(key)
+            else:
+                key = convertKey(key)
             ocrResultList.append({key: value})
     return ocrResultList
