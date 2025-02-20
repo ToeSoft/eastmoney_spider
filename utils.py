@@ -246,7 +246,8 @@ def getData(stockCode, onError):
 
     try:
         chromePage.get("https://quote.eastmoney.com/concept/" + stockCode + ".html")
-        time.sleep(3)
+        # 等待页面加载完成
+        time.sleep(5)
         name = chromePage.ele("tag:span@class=name")
 
         detailTable = chromePage.ele("tag:div@class=stockitems").ele("tag:table")
