@@ -8,14 +8,14 @@ from PIL import Image, ImageEnhance, ImageFilter
 from DrissionPage import ChromiumOptions
 from excel import generateExcel, generateTxt
 import concurrent.futures
-
+import pytesseract
 
 dictMap = {
     "RSIG": "RSI6",
     "成交量": "VOL",
-    "[交量":"VOL",
-    "嵌交量":"VOL",
-    "成交垂":"VOL",
+    "[交量": "VOL",
+    "嵌交量": "VOL",
+    "成交垂": "VOL",
     "PDl": "PDI",
     "MDl": "MDI",
     "BIASG": "BIAS6",
@@ -25,27 +25,28 @@ dictMap = {
     "WRG": "WR6",
     "』": "J",
     "ROCMA": "ROC_MA",
-    "WRIO":"WR10",
-    "BI4S6":"BIAS6",
-    "80S24":"BIAS24",
-    "BlAS24":"BIAS24",
-    "WIRIO":"WR10",
-    "OBVMA":"OBV_MA",
-    "RS124":"RSI24",
-    "BlAS6":"BIAS6",
-    "BlAS12":"BIAS12",
-    "BIA86":"BIAS6",
-    "BIA812":"BIAS12",
-    "BIA824":"BIAS24",
-    "BlA86":"BIAS6",
-    "BlA812":"BIAS12",
-    "BlA824":"BIAS24",
-    "MAI":"MA1",
-    "RSII2":"RSI12",
-    "IRG":"WR6",
-    "NA10":"MA10",
-    "VA5":"MA5",
-    "MAZ":"MA2"
+    "WRIO": "WR10",
+    "BI4S6": "BIAS6",
+    "80S24": "BIAS24",
+    "BlAS24": "BIAS24",
+    "WIRIO": "WR10",
+    "OBVMA": "OBV_MA",
+    "RS124": "RSI24",
+    "BlAS6": "BIAS6",
+    "BlAS12": "BIAS12",
+    "BIA86": "BIAS6",
+    "BIA812": "BIAS12",
+    "BIA824": "BIAS24",
+    "BlA86": "BIAS6",
+    "BlA812": "BIAS12",
+    "BlA824": "BIAS24",
+    "MAI": "MA1",
+    "RSII2": "RSI12",
+    "IRG": "WR6",
+    "NA10": "MA10",
+    "VA5": "MA5",
+    "MAZ": "MA2",
+    "BlIAS24": "BIAS24",
 }
 
 
@@ -62,7 +63,7 @@ def cropMid(tempImagePath, img):
     width, height = img.size
     left = 0
     # top = 743
-    top = height/2 + height * 0.142
+    top = height / 2 + height * 0.142
     right = width / 2
     # bottom = height - 383
     bottom = height - height * 0.33
@@ -82,15 +83,16 @@ def cropBottom(tempImagePath, img, name):
 
 
 def cropImage(img, top, bottom, left, right, tempImagePath, saveName):
+    if "CCI" in saveName:
+        right = right / 2
     cropped_img = img.crop((left, top, right, bottom))
-    cropped_img = cropped_img.convert("L")
-    cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
-    enhancer = ImageEnhance.Contrast(cropped_img)
-    cropped_img = enhancer.enhance(1.8)
-    # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
-    cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
-
-
+    if "CCI" in saveName:
+        cropped_img = cropped_img.convert("L")
+        cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
+        enhancer = ImageEnhance.Contrast(cropped_img)
+        cropped_img = enhancer.enhance(1.8)
+        cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
+        cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
 
     imgPath = os.path.join(tempImagePath, saveName)
     cropped_img.save(imgPath)
@@ -115,31 +117,7 @@ def convertKey(key):
     return key
 
 
-def getImageText(reader, imageName):
-    # 读取图像中的文本
-    result = reader.readtext(imageName, detail=0)
-
-    # 先合并
-    if len(result) > 1:
-        result = [" ".join(result)]
-
-    ocrResultList = []
-    for detection in result:
-        for text in detection.replace(": ", ":").replace("; ", ":").replace(";", ":").split(" "):
-            if ":" in text:
-                key, value = text.split(":")
-                key = convertKey(key)
-                ocrResultList.append({key: value})
-            else:
-                if "KDJ" in imageName  and "K" in text:
-                    text = text.replace("K", "K:")
-                    key, value = text.split(":")
-                    key = convertKey(key)
-                    ocrResultList.append({key: value})
-    return ocrResultList
-
-
-def startWithThread(items, reader, onFinish, onError,output_format):
+def startWithThread(items, reader, onFinish, onError, output_format):
     # 记录开始时间
     start_time = time.time()
 
@@ -162,21 +140,15 @@ def startWithThread(items, reader, onFinish, onError,output_format):
         concurrent.futures.wait(futures)
 
         # 记录线程任务完成的时间
-        step3_ = time.time()
-
-
+        step3 = time.time()
 
     for i in os.listdir(os.path.join("temp")):
         saveOcrJsonData(i, reader, onError)
-        # 记录保存OCR数据的时间
+    # 记录保存OCR数据的时间
     step4 = time.time()
-
-
 
     updateStockList()
     step5 = time.time()
-
-
 
     with open("stock_list.json", "r", encoding="utf-8") as f:
         stockList = json.load(f)
@@ -184,21 +156,18 @@ def startWithThread(items, reader, onFinish, onError,output_format):
             if ":" not in i:
                 continue
             if output_format == "excel":
-                generateExcel(i.split(":")[1], i.split(":")[0],onError)
+                generateExcel(i.split(":")[1], i.split(":")[0], onError)
             else:
                 generateTxt(i.split(":")[1], i.split(":")[0], onError)
-
 
     # 读取stock_list.json的时间
     step6 = time.time()
 
-
-
     # 计算每一步的耗时
     print(f"创建temp目录耗时: {step1 - start_time:.2f} 秒")
     print(f"创建线程池耗时: {step2 - step1:.2f} 秒")
-    print(f"线程任务完成耗时: {step3_ - step2:.2f} 秒")
-    print(f"保存OCR数据耗时: {step4 - step3_:.2f} 秒")
+    print(f"线程任务完成耗时: {step3 - step2:.2f} 秒")
+    print(f"保存OCR数据耗时: {step4 - step3:.2f} 秒")
     print(f"生成Excel耗时: {step5 - step4:.2f} 秒")
     print(f"保存stock_list.json耗时: {step6 - step5:.2f} 秒")
     # 完整执行时间
@@ -214,7 +183,7 @@ def saveOcrJsonData(stockCode, reader, onError):
     #  tempStockDir 下所有的png文件
     jsonData = []
     try:
-        for i in sorted(os.listdir(tempStockDir),reverse=True):
+        for i in sorted(os.listdir(tempStockDir), reverse=True):
             if "data.json" in i:
                 continue
             keyName = i.split("_")[-1].replace(".png", "")
@@ -236,12 +205,12 @@ def saveOcrJsonData(stockCode, reader, onError):
                 json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(str(e))
-        onError(stockCode+"OCR识别失败")
+            f.write(time.time() + str(e) + "\n")
+        onError(stockCode + "OCR识别失败")
 
 
-def startGetData(items, reader, onFinish, onError,output_format):
-    threading.Thread(target=startWithThread, args=(items, reader, onFinish, onError,output_format)).start()
+def startGetData(items, reader, onFinish, onError, output_format):
+    threading.Thread(target=startWithThread, args=(items, reader, onFinish, onError, output_format)).start()
 
 
 def getData(stockCode, onError):
@@ -291,12 +260,11 @@ def getData(stockCode, onError):
             imgFileNameList.append(filename)
             canvas.get_screenshot(path=os.path.join("temp", stockCode), name=filename)
 
-
         tempData = [
             {"名称": name.text},
             {"代码": stockCode},
-            {"涨跌额":zde.text},
-            {"涨跌幅":zdf.text},
+            {"涨跌额": zde.text},
+            {"涨跌幅": zdf.text},
         ]
         tempData.extend(detailList)
 
@@ -311,7 +279,7 @@ def getData(stockCode, onError):
         with open("error.log", "a", encoding="utf-8") as f:
             f.write(str(e))
 
-        onError(stockCode+"获取数据失败")
+        onError(stockCode + "获取数据失败")
 
     # 关闭浏览器
     chromePage.quit()
@@ -336,7 +304,7 @@ def getData(stockCode, onError):
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
             f.write(str(e))
-        onError(stockCode+"处理图片失败")
+        onError(stockCode + "处理图片失败")
 
 
 def updateStockList():
@@ -356,7 +324,7 @@ def updateStockList():
                 with open((os.path.join(tempStockDir, stockCode, "data.json")), "r", encoding="utf-8") as f:
                     dataJson = json.load(f)
                     stockName = dataJson[0]["概览"][0]["名称"]
-                    tempStockList.append(stockCode+":"+stockName)
+                    tempStockList.append(stockCode + ":" + stockName)
             else:
                 tempStockList.append(stockCode)
 
@@ -366,3 +334,17 @@ def updateStockList():
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
             f.write(str(e))
+
+
+def getImageText(reader, imageName):
+    # 读取图像中的文本
+    result = pytesseract.image_to_string(Image.open(imageName), lang='chi_sim')
+
+    resultList = result.replace("|", "").replace(": ", ":").replace("\n", "").split(" ")
+    ocrResultList = []
+    for text in resultList:
+        if ":" in text:
+            key, value = text.split(":")
+            key = convertKey(key)
+            ocrResultList.append({key: value})
+    return ocrResultList

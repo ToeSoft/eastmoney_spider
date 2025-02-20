@@ -9,7 +9,6 @@ def generateTxt(name, code, onError):
     try:
         # 读取文件夹中的所有文件
         dir = os.path.join("temp", code)
-        files = os.listdir(dir)
 
         # 读取data.json文件
         with open(os.path.join(dir, "data.json"), "r", encoding="utf-8") as f:
@@ -30,12 +29,17 @@ def generateTxt(name, code, onError):
             for i in jsonData:
                 for tag, value in i.items():
                     # Write tag name
-                    f.write(f"{tag}\n")
+                    if tag != "概览" and tag != "中部" and tag != "顶部":
+                        f.write(f"{tag}：\n")
 
                     # Write the elements inside the tag on a single line
+                    count = 0
                     for x in value:
                         for z in x.keys():
+                            if tag == "概览" and count % 4 == 0 and count != 0:
+                                f.write("\n")  # Ensure elements are on one line for each entry
                             f.write(f"{z}: {x[z]} ")
+                            count += 1
                     f.write("\n")  # Ensure elements are on one line for each entry
 
         # 提示成功
@@ -53,9 +57,6 @@ def generateExcel(name, code,onError):
     try:
         # 读取文件夹中的所有文件
         dir = os.path.join("temp", code)
-        files = os.listdir(dir)
-        # print(files)
-
         # 读取data.json文件
         with open(os.path.join(dir, "data.json"), "r",encoding="utf-8") as f:
             jsonData = json.load(f)
@@ -136,6 +137,3 @@ def generateExcel(name, code,onError):
         with open("error.log", "a", encoding="utf-8") as f:
             f.write(str(e))
         onError(code+"生成Excel失败")
-
-
-# generateExcel("name", "sz300059")

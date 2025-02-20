@@ -4,7 +4,7 @@ import shutil
 from functools import partial
 import json
 
-from easyocr import easyocr
+# from easyocr import easyocr
 from kivy.config import Config
 
 from utils import startGetData
@@ -129,7 +129,7 @@ class MyApp(App):
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 items = json.load(f)
             output_format = 'txt' if self.txt_radio.state == 'down' else 'excel'
-            startGetData(items, reader, self.onFinish, self.onError,output_format)
+            startGetData(items, None, self.onFinish, self.onError,output_format)
 
     def onFinish(self):
         Clock.schedule_once(lambda dt: self.close_loading_popup(), 0)
@@ -280,11 +280,6 @@ class MyApp(App):
 
 
 if __name__ == '__main__':
-    # 创建 OCR 识别器对象，指定语言
-    modelPath = os.path.join("model")
-    reader = easyocr.Reader(['en', 'ch_sim'], model_storage_directory=os.path.join("model"),
-                            download_enabled=False)  # 英文和简体中文
-
     # 创建result 文件夹
     if not os.path.exists("result"):
         os.makedirs("result")
