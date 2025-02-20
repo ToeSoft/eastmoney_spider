@@ -47,12 +47,16 @@ dictMap = {
     "VA5": "MA5",
     "MAZ": "MA2",
     "BlIAS24": "BIAS24",
+    "DOBV": "OBV",
+    "MAS": "MA3",
+    "MAS5":"MA5",
+    "A5":"MA5",
 }
 
 
 def cropTop(tempImagePath, img):
     width, height = img.size
-    left = width * 0.1825
+    left = width * 0.178
     top = 0
     right = width / 2 + 300
     bottom = height * 0.035
@@ -66,7 +70,7 @@ def cropMid(tempImagePath, img):
     top = height / 2 + height * 0.142
     right = width / 2
     # bottom = height - 383
-    bottom = height - height * 0.33
+    bottom = height - height * 0.331
     return cropImage(img, top, bottom, left, right, tempImagePath, 'charts_mid.png')
 
 
@@ -77,7 +81,7 @@ def cropBottom(tempImagePath, img, name):
     top = height / 2 + height * 0.325
     right = width / 2
     # bottom = height - 170
-    bottom = height - height * 0.149
+    bottom = height - height * 0.145
     return cropImage(img, top, bottom, left, right, tempImagePath,
                      'charts_btm_' + name.split("_")[1].replace(".png", "") + '.png')
 
@@ -86,13 +90,15 @@ def cropImage(img, top, bottom, left, right, tempImagePath, saveName):
     if "CCI" in saveName:
         right = right / 2
     cropped_img = img.crop((left, top, right, bottom))
-    if "CCI" in saveName:
-        cropped_img = cropped_img.convert("L")
-        cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
-        enhancer = ImageEnhance.Contrast(cropped_img)
-        cropped_img = enhancer.enhance(1.8)
-        cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
-        cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
+    cropped_img = cropped_img.convert("L")
+    # cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
+    # if "CCI" in saveName:
+    #     cropped_img = cropped_img.convert("L")
+    #     cropped_img = cropped_img.resize((cropped_img.width * 3, cropped_img.height * 3), Image.Resampling.LANCZOS)
+    enhancer = ImageEnhance.Contrast(cropped_img)
+    cropped_img = enhancer.enhance(1)
+    # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
+    # cropped_img = cropped_img.filter(ImageFilter.SHARPEN)
 
     imgPath = os.path.join(tempImagePath, saveName)
     cropped_img.save(imgPath)
@@ -103,6 +109,7 @@ def startCropImage(tempImagePath, imgFileNameList):
     print("startCropImage", tempImagePath, imgFileNameList)
     for imgFileName in imgFileNameList:
         img = Image.open(os.path.join(tempImagePath, imgFileName))
+        img = img.resize((1800, 1160), Image.Resampling.LANCZOS)
         if "RSI" in imgFileName:
             cropTop(tempImagePath, img),
             cropMid(tempImagePath, img),
@@ -184,6 +191,8 @@ def saveOcrJsonData(stockCode, reader, onError):
     jsonData = []
     try:
         for i in sorted(os.listdir(tempStockDir), reverse=True):
+            if ".png" not in i:
+                continue
             if "data.json" in i:
                 continue
             keyName = i.split("_")[-1].replace(".png", "")
@@ -205,7 +214,7 @@ def saveOcrJsonData(stockCode, reader, onError):
                 json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(time.time() + str(e) + "\n")
+            f.write(str(e) + "\n")
         onError(stockCode + "OCR识别失败")
 
 
@@ -277,7 +286,7 @@ def getData(stockCode, onError):
         # 将详细错误信息写入error.log日志
 
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(str(e))
+            f.write(str(e) + "\n")
 
         onError(stockCode + "获取数据失败")
 
@@ -303,7 +312,7 @@ def getData(stockCode, onError):
                     os.remove(os.path.join("temp", stockCode, charts_file))
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(str(e))
+            f.write(str(e) + "\n")
         onError(stockCode + "处理图片失败")
 
 
@@ -333,14 +342,20 @@ def updateStockList():
             json.dump(tempStockList, f, ensure_ascii=False, indent=4)
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(str(e))
+            f.write(str(e) + "\n")
 
 
 def getImageText(reader, imageName):
     # 读取图像中的文本
-    result = pytesseract.image_to_string(Image.open(imageName), lang='chi_sim')
-
-    resultList = result.replace("|", "").replace(": ", ":").replace("\n", "").split(" ")
+    if "OBV" in imageName or "mid" in imageName:
+        result = pytesseract.image_to_string(Image.open(imageName), lang='chi_sim')
+    else:
+        result = pytesseract.image_to_string(Image.open(imageName))
+    print("result", result)
+    resultList = (result.replace("|", "").replace(": ", ":").replace("\n", "")
+                  .replace("{Z", "亿").replace("ROC ", "ROC_").replace("OBV ", "OBV_").replace("ROC_ ", "ROC_").replace(
+        "OBV_ ", "OBV_")
+                  .split(" "))
     ocrResultList = []
     for text in resultList:
         if ":" in text:
