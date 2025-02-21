@@ -37,6 +37,52 @@ class MyApp(App):
         # 左侧布局（添加爬取按钮和输入框）
         left_layout = BoxLayout(orientation='vertical', size_hint=(0.55, 1), padding=[10, 10], spacing=10)
 
+        # **新增布局 - 输入框和提示** #
+        # 爬取线程布局
+        thread_crawl_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, spacing=10)
+        self.crawl_input = TextInput(
+            hint_text='设置爬取线程数',
+            size_hint_y=None,
+            height=60,
+            size_hint_x=0.7,  # 输入框占用 70% 宽度
+            multiline=False,
+            text=f'{int(os.cpu_count() / 2)}',
+            input_filter='int',
+        )
+        crawl_label = Label(
+            text="爬取线程",
+            size_hint_x=0.3,  # 标签占用 30% 宽度
+            size_hint_y=None,
+            height=60
+        )
+        thread_crawl_layout.add_widget(self.crawl_input)
+        thread_crawl_layout.add_widget(crawl_label)
+
+        # 识别线程布局
+        thread_recog_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, spacing=10)
+        self.recog_input = TextInput(
+            hint_text='设置识别线程数',
+            size_hint_y=None,
+            height=60,
+            size_hint_x=0.7,
+            multiline=False,
+            text=f'{os.cpu_count()}',
+            input_filter='int',
+
+        )
+        recog_label = Label(
+            text="识别线程",
+            size_hint_x=0.3,
+            size_hint_y=None,
+            height=60
+        )
+        thread_recog_layout.add_widget(self.recog_input)
+        thread_recog_layout.add_widget(recog_label)
+
+        # **添加到左侧布局上** #
+        left_layout.add_widget(thread_crawl_layout)
+        left_layout.add_widget(thread_recog_layout)
+
         # 添加爬取按钮
         self.scrape_button = Button(text='开始爬取', size_hint_y=None, height=60)
         self.scrape_button.bind(on_press=self.start_scraping)  # 绑定点击事件
@@ -69,7 +115,6 @@ class MyApp(App):
         excel_label = Label(text="输出 Excel", size_hint_y=None, height=60)
         self.radio_layout.add_widget(self.excel_radio)
         self.radio_layout.add_widget(excel_label)
-
 
         # 将输入框和添加按钮放入水平布局
         input_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, spacing=10)
@@ -129,7 +174,8 @@ class MyApp(App):
             with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 items = json.load(f)
             output_format = 'txt' if self.txt_radio.state == 'down' else 'excel'
-            startGetData(items, None, self.onFinish, self.onError,output_format)
+            startGetData(items, self.onFinish, self.onError, output_format, int(self.crawl_input.text),
+                         int(self.recog_input.text))
 
     def onFinish(self):
         Clock.schedule_once(lambda dt: self.close_loading_popup(), 0)
@@ -137,7 +183,7 @@ class MyApp(App):
         Clock.schedule_once(lambda dt: self.text_list_layout.clear_widgets(), 0)
         Clock.schedule_once(lambda dt: self.load_data(), 0)
 
-    def onError(self, text,auto_dismiss=False):
+    def onError(self, text, auto_dismiss=False):
         Clock.schedule_once(lambda dt: self.show_tips_popup(text, auto_dismiss), 0)
 
     def show_loading_popup(self):

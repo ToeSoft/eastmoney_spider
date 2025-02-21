@@ -85,7 +85,6 @@ dictMap = {
     "DOBV_MA": "OBV_MA",
     "DBV": "OBV",
     "RS1I24": "RSI24",
-    "1K": "K"
 }
 
 
@@ -169,7 +168,7 @@ def convertKeyTop(key):
     return key
 
 
-def startWithThread(items, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount):
+def startWithThread(items, reader, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount):
     # 记录开始时间
     start_time = time.time()
 
@@ -177,36 +176,33 @@ def startWithThread(items, onFinish, onError, output_format, crawlThreadCount, o
 
     # 记录创建temp目录的时间
     step1 = time.time()
-    # **创建一个共享的浏览器实例**
-    co = ChromiumOptions().headless()
-    chromePage = ChromiumPage(co)
-    chromePage.get_tab().close()
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=crawlThreadCount) as executor:
-            futures = []
-            for item in items:
-                stockCode = item.split(":")[0]
-                os.makedirs(os.path.join("temp", stockCode), exist_ok=True)
-                # 将浏览器对象传递给线程任务
-                futures.append(executor.submit(getData, stockCode, onError, chromePage, 0))
-            concurrent.futures.wait(futures)
-    finally:
-        # 确保任务完成后关闭浏览器
-        chromePage.quit()
 
-        # 记录线程任务完成的时间
+    with concurrent.futures.ThreadPoolExecutor(max_workers=crawlThreadCount) as executor:
+        futures = []
+
+        # 记录创建线程池的时间
         step2 = time.time()
 
-    # # 进行 OCR 数据处理任务
-    with concurrent.futures.ThreadPoolExecutor(max_workers=ocrThreadCount) as executor:
-        futures = [executor.submit(saveOcrJsonData, i, onError) for i in os.listdir("temp")]
+        for i in range(len(items)):
+            os.makedirs(os.path.join("temp", items[i].split(":")[0]), exist_ok=True)
+            futures.append(executor.submit(getData, items[i].split(":")[0], onError, None, 0))
+
+        # 等待所有线程执行完毕
         concurrent.futures.wait(futures)
 
+        # 记录线程任务完成的时间
+        step3 = time.time()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=ocrThreadCount) as executor:
+        futures = []
+        for i in os.listdir(os.path.join("temp")):
+            futures.append(executor.submit(saveOcrJsonData, i, reader, onError))
+            # saveOcrJsonData(i, reader, onError)
+    concurrent.futures.wait(futures)
     # 记录保存OCR数据的时间
-    step3 = time.time()
+    step4 = time.time()
 
     updateStockList()
-    step4 = time.time()
+    step5 = time.time()
 
     with open("stock_list.json", "r", encoding="utf-8") as f:
         stockList = json.load(f)
@@ -219,21 +215,22 @@ def startWithThread(items, onFinish, onError, output_format, crawlThreadCount, o
                 generateTxt(i.split(":")[1], i.split(":")[0], onError)
 
     # 读取stock_list.json的时间
-    step5 = time.time()
+    step6 = time.time()
 
     # 计算每一步的耗时
     print(f"创建temp目录耗时: {step1 - start_time:.2f} 秒")
-    print(f"线程任务完成耗时: {step2 - step1:.2f} 秒")
-    print(f"保存OCR数据耗时: {step3 - step2:.2f} 秒")
-    print(f"生成{output_format}耗时: {step4 - step3:.2f} 秒")
-    print(f"保存stock_list.json耗时: {step5 - step4:.2f} 秒")
+    print(f"创建线程池耗时: {step2 - step1:.2f} 秒")
+    print(f"线程任务完成耗时: {step3 - step2:.2f} 秒")
+    print(f"保存OCR数据耗时: {step4 - step3:.2f} 秒")
+    print(f"生成Excel耗时: {step5 - step4:.2f} 秒")
+    print(f"保存stock_list.json耗时: {step6 - step5:.2f} 秒")
     # 完整执行时间
-    print(f"总执行时间: {step5 - start_time:.2f} 秒")
+    print(f"总执行时间: {step6 - start_time:.2f} 秒")
 
     onFinish()
 
 
-def saveOcrJsonData(stockCode, onError):
+def saveOcrJsonData(stockCode, reader, onError):
     tempStockDir = os.path.join("temp", stockCode)
     jsonPath = os.path.join(tempStockDir, "data.json")
 
@@ -251,7 +248,7 @@ def saveOcrJsonData(stockCode, onError):
                 keyName = "顶部"
             if "mid" in keyName:
                 keyName = "中部"
-            ocr_result = getImageText(os.path.join(tempStockDir, i))
+            ocr_result = getImageText(reader, os.path.join(tempStockDir, i))
             print(ocr_result)
             jsonData.append({keyName: ocr_result})
 
@@ -268,36 +265,44 @@ def saveOcrJsonData(stockCode, onError):
         onError(stockCode + "OCR识别失败")
 
 
-def startGetData(items, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount):
+def startGetData(items, reader, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount):
     threading.Thread(target=startWithThread,
-                     args=(items, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount)).start()
+                     args=(items, reader, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount)).start()
 
 
-def getData(stockCode, onError, chromePage, retryTime):
+def getData(stockCode, onError, chrome, retryTime):
+    codeFileMap = []
+
+    if chrome is not None:
+        chromePage = chrome
+    else:
+        # co = ChromiumOptions().headless().auto_port()
+        co = ChromiumOptions().auto_port()
+        chromePage = ChromiumPage(co)
+
     try:
-        # 打开新的标签页，处理当前股票代码
-        stockTab = chromePage.new_tab(f"https://quote.eastmoney.com/concept/{stockCode}.html?from=classic")
+        if chrome is None:
+            chromePage.get("https://quote.eastmoney.com/concept/" + stockCode + ".html?from=classic")
+        # 等待页面加载完成
+        name = chromePage.ele("tag:span@class=name")
+        zde = chromePage.ele("tag:span@class=zde")
+        zdf = chromePage.ele("tag:span@class=zdf")
 
-        # 等待页面加载并获取所需内容
-        time.sleep(2)
-        name = stockTab.ele("tag:span@class=name").text
-        zde = stockTab.ele("tag:span@class=zde").text
-        zdf = stockTab.ele("tag:span@class=zdf").text
+        detailTable = chromePage.ele("tag:div@class=stockitems").ele("tag:table")
 
-        # 获取详情表格
-        detailTable = stockTab.ele("tag:div@class=stockitems").ele("tag:table")
         trList = detailTable.ele("tag:tbody").eles("tag:tr")
         detailList = []
         for tr in trList:
             tdList = tr.eles("tag:td")
-            for td in tdList[:-1]:  # 忽略最后一个 td
+            # 批除最后一个td
+            for td in tdList[:-1]:
                 item = td.ele("tag:div@class=item")
-                key = item.ele("@class=l").text
-                value = item.ele("@class=r").text
-                detailList.append({key: value})
+                key = item.ele("@class=l")
+                value = item.ele("@class=r")
+                detailList.append({key.text: value.text})
 
-        # 切换到charts图表数据
-        charts = stockTab.ele("tag:div@class=charts")
+        charts = chromePage.ele("tag:div@class=charts")
+
         li = charts.ele("tag:div").eles("tag:div")[0].ele("tag:ul").eles("tag:li")
         for i in li:
             if i.text == "日K":
@@ -306,59 +311,72 @@ def getData(stockCode, onError, chromePage, retryTime):
                 i.click()
                 break
 
-        # 保存图片和 JSON 数据
+        tablist = chromePage.ele("tag:div@class=f_zb").ele("tag:ul").eles("tag:li")
         imgFileNameList = []
-        tablist = stockTab.ele("tag:div@class=f_zb").ele("tag:ul").eles("tag:li")
         for tab in tablist[1:]:
             tab.click()
-            time.sleep(0.3)
-            filename = f"charts_{tab.text}.png"
+            # time.sleep(0.5)
+            filename = "charts_" + tab.text + ".png"
             canvas = charts.ele("tag:canvas")
             imgFileNameList.append(filename)
             canvas.get_screenshot(path=os.path.join("temp", stockCode), name=filename)
 
-        stockTab.close()
-
         tempData = [
-            {"名称": name},
+            {"名称": name.text},
             {"代码": stockCode},
-            {"涨跌额": zde},
-            {"涨跌幅": zdf},
+            {"涨跌额": zde.text},
+            {"涨跌幅": zdf.text},
         ]
 
-        # 限制详情条目数量
         if len(detailList) > 12:
             tempData.extend(detailList[:12])
         else:
             tempData.extend(detailList)
 
-        # 保存数据为 JSON
-        os.makedirs(os.path.join("temp", stockCode), exist_ok=True)
         with open(os.path.join("temp", stockCode, "data.json"), "w", encoding="utf-8") as f:
             json.dump([{"概览": tempData}], f, ensure_ascii=False, indent=4)
 
-        # 裁剪图片并处理
-        startCropImage(os.path.join("temp", stockCode), imgFileNameList)
-        charts_files = os.listdir(os.path.join("temp", stockCode))
-        for charts_file in charts_files:
-            if "charts_top" in charts_file:
-                continue
-            if "charts_mid" in charts_file:
-                continue
-            if "charts_btm" in charts_file:
-                continue
-            if "data.json" in charts_file:
-                continue
-            os.remove(os.path.join("temp", stockCode, charts_file))
+        codeFileMap.append({stockCode: imgFileNameList})
+
     except Exception as e:
-        if "没有找到元素。" in str(e) and retryTime < 3:
-            print(f"{stockCode}: 没有找到元素，重试中...")
-            time.sleep(5)
+        # 将详细错误信息写入error.log日志
+        if "没有找到元素。" in str(e):
+            if retryTime >= 3:
+                onError(stockCode + "获取数据失败请检查股票代码或网络连接")
+                return
+            print(stockCode + ":没有找到元素。重试中....")
+            time.sleep(3)
             getData(stockCode, onError, chromePage, retryTime + 1)
-            return
+
         with open("error.log", "a", encoding="utf-8") as f:
-            f.write(f"{stockCode} 错误：{str(e)}\n")
-        onError(f"{stockCode} 获取数据失败")
+            f.write(str(e) + "\n")
+
+        onError(stockCode + "获取数据失败")
+
+    # 关闭浏览器
+    chromePage.quit()
+
+    try:
+        for i in codeFileMap:
+            for key in i:
+                stockCode = key
+                imgFileNameList = i[key]
+                startCropImage(os.path.join("temp", stockCode), imgFileNameList)
+                charts_files = os.listdir(os.path.join("temp", stockCode))
+                for charts_file in charts_files:
+                    if "charts_top" in charts_file:
+                        continue
+                    if "charts_mid" in charts_file:
+                        continue
+                    if "charts_btm" in charts_file:
+                        continue
+                    if "data.json" in charts_file:
+                        continue
+                    os.remove(os.path.join("temp", stockCode, charts_file))
+    except Exception as e:
+        with open("error.log", "a", encoding="utf-8") as f:
+            f.write(str(e) + "\n")
+        onError(stockCode + "处理图片失败")
 
 
 def updateStockList():
@@ -390,7 +408,7 @@ def updateStockList():
             f.write(str(e) + "\n")
 
 
-def getImageText(imageName):
+def getImageText(reader, imageName):
     # 读取图像中的文本
     if "OBV" in imageName or "mid" in imageName:
         result = pytesseract.image_to_string(Image.open(imageName), lang='chi_sim')
