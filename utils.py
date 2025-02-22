@@ -217,16 +217,14 @@ def startWithThread(items, onFinish, onError, output_format, crawlThreadCount, o
                 generateExcel(i.split(":")[1], i.split(":")[0], onError)
             else:
                 generateTxt(i.split(":")[1], i.split(":")[0], onError)
-
-    # 读取stock_list.json的时间
     step5 = time.time()
 
     # 计算每一步的耗时
     print(f"创建temp目录耗时: {step1 - start_time:.2f} 秒")
     print(f"线程任务完成耗时: {step2 - step1:.2f} 秒")
     print(f"保存OCR数据耗时: {step3 - step2:.2f} 秒")
-    print(f"生成{output_format}耗时: {step4 - step3:.2f} 秒")
-    print(f"保存stock_list.json耗时: {step5 - step4:.2f} 秒")
+    print(f"保存stock_list.json耗时: {step4 - step3:.2f} 秒")
+    print(f"生成{output_format}耗时: {step5 - step4:.2f} 秒")
     # 完整执行时间
     print(f"总执行时间: {step5 - start_time:.2f} 秒")
 
@@ -255,17 +253,30 @@ def saveOcrJsonData(stockCode, onError):
             print(ocr_result)
             jsonData.append({keyName: ocr_result})
 
-        with open(jsonPath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            data.extend(jsonData)
+            # 处理 JSON 数据
+        if os.path.exists(jsonPath):
+            with open(jsonPath, "r", encoding="utf-8") as f:
+                existing_data = json.load(f)
+            existing_data.extend(jsonData)
+        else:
+            existing_data = jsonData
 
-            with open(jsonPath, "w", encoding="utf-8") as f:
-                # 重新写入
-                json.dump(data, f, ensure_ascii=False, indent=4)
+        with open(jsonPath, "w", encoding="utf-8") as f:
+            json.dump(existing_data, f, ensure_ascii=False, indent=4)
+
     except Exception as e:
         with open("error.log", "a", encoding="utf-8") as f:
             f.write(str(e) + "\n")
         onError(stockCode + "OCR识别失败")
+
+def processOCR(stockCode):
+    """
+    单独处理 OCR 的多进程任务
+    """
+    try:
+        saveOcrJsonData(stockCode, lambda error: print(error))
+    except Exception as e:
+        print(f"OCR 多进程错误: {e}")
 
 
 def startGetData(items, onFinish, onError, output_format, crawlThreadCount, ocrThreadCount):
