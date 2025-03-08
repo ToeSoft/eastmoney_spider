@@ -269,6 +269,7 @@ def saveOcrJsonData(stockCode, onError):
             f.write(str(e) + "\n")
         onError(stockCode + "OCR识别失败")
 
+
 def processOCR(stockCode):
     """
     单独处理 OCR 的多进程任务
@@ -292,8 +293,8 @@ def getData(stockCode, onError, chromePage, retryTime):
         # 等待页面加载并获取所需内容
         time.sleep(2)
         name = stockTab.ele("tag:span@class=name").text
-        zde = stockTab.ele("tag:span@class=zde").text
-        zdf = stockTab.ele("tag:span@class=zdf").text
+        zde = stockTab.ele("tag:div@class=stockquote").ele("tag:span@class=zde").text
+        zdf = stockTab.ele("tag:div@class=stockquote").ele("tag:span@class=zdf").text
 
         # 获取详情表格
         detailTable = stockTab.ele("tag:div@class=stockitems").ele("tag:table")

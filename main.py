@@ -201,11 +201,15 @@ class MyApp(App):
         self.tips_popup.open()
         #     延迟三秒后关闭弹出框
         if auto_dismiss:
-            Clock.schedule_once(lambda dt: self.close_loading_popup(), 3)
+            Clock.schedule_once(lambda dt: self.close_tips_popup(), 3)
 
     def close_loading_popup(self):
         # 关闭弹出框
         self.popup.dismiss()
+
+    def close_tips_popup(self):
+        # 关闭弹出框
+        self.tips_popup.dismiss()
 
     def add_text(self, instance):
         # 获取输入框中的文本
